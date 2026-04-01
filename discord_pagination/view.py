@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, TypeAlias, TypeVar
 
 import discord
 
 T = TypeVar("T")
+ViewButton: TypeAlias = discord.ui.Button[discord.ui.View]
 
 
 @dataclass(slots=True)
@@ -92,7 +93,7 @@ class PaginationView(discord.ui.View, Generic[T]):
             )
             self._message = await target.original_response()
         else:
-            self._message = await target.send(content=content, embed=embed, view=self)  # type: ignore[call-overload]
+            self._message = await target.send(content=content, embed=embed, view=self)
 
     # ── Hook (override in subclasses) ───────────────────────────
 
@@ -121,7 +122,7 @@ class PaginationView(discord.ui.View, Generic[T]):
         return self.create_embed(self._get_page_items())
 
     def _sync_buttons(self) -> None:
-        pairs = [
+        pairs: list[tuple[ViewButton, bool]] = [
             (self._btn_first, self.current_page <= 1),
             (self._btn_prev, self.current_page <= 1),
             (self._btn_next, self.current_page >= self.total_pages),
@@ -138,7 +139,14 @@ class PaginationView(discord.ui.View, Generic[T]):
         await interaction.edit_original_response(embed=embed, view=self)
 
     async def on_timeout(self) -> None:
-        for btn in (self._btn_first, self._btn_prev, self._btn_next, self._btn_last):
+        buttons: tuple[ViewButton, ...] = (
+            self._btn_first,
+            self._btn_prev,
+            self._btn_next,
+            self._btn_last
+        )
+        
+        for btn in buttons:
             btn.disabled = True
             btn.style = discord.ButtonStyle.gray
         if self._message:
@@ -149,7 +157,7 @@ class PaginationView(discord.ui.View, Generic[T]):
 
     @discord.ui.button(emoji="⏮", style=discord.ButtonStyle.grey, disabled=True)
     async def _btn_first(
-        self, interaction: discord.Interaction, _: discord.ui.Button,
+        self, interaction: discord.Interaction, _: ViewButton,
     ) -> None:
         await interaction.response.defer()
         self.current_page = 1
@@ -157,7 +165,7 @@ class PaginationView(discord.ui.View, Generic[T]):
 
     @discord.ui.button(emoji="⏪", style=discord.ButtonStyle.grey, disabled=True)
     async def _btn_prev(
-        self, interaction: discord.Interaction, _: discord.ui.Button,
+        self, interaction: discord.Interaction, _: ViewButton,
     ) -> None:
         await interaction.response.defer()
         self.current_page -= 1
@@ -165,7 +173,7 @@ class PaginationView(discord.ui.View, Generic[T]):
 
     @discord.ui.button(emoji="⏩", style=discord.ButtonStyle.grey, disabled=True)
     async def _btn_next(
-        self, interaction: discord.Interaction, _: discord.ui.Button,
+        self, interaction: discord.Interaction, _: ViewButton,
     ) -> None:
         await interaction.response.defer()
         self.current_page += 1
@@ -173,7 +181,7 @@ class PaginationView(discord.ui.View, Generic[T]):
 
     @discord.ui.button(emoji="⏭", style=discord.ButtonStyle.grey, disabled=True)
     async def _btn_last(
-        self, interaction: discord.Interaction, _: discord.ui.Button,
+        self, interaction: discord.Interaction, _: ViewButton,
     ) -> None:
         await interaction.response.defer()
         self.current_page = self.total_pages

@@ -4,10 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "discord-pagination"
-version = "0.1.0"
+version = "0.1.1"
 description = "A generic, reusable pagination view for discord.py bots."
 requires-python = ">=3.10"
 dependencies = ["discord.py>=2.0"]
 
 [project.optional-dependencies]
-dev = ["pyright"]
+dev = ["pyright", "pytest"]
+
+[tool.setuptools.package-data]
+discord_pagination = ["py.typed"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
