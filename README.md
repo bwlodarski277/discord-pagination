@@ -5,7 +5,7 @@ A generic, reusable pagination view for [discord.py](https://github.com/Rapptz/d
 ## Installation
 
 ```bash
-pip install "git+https://github.com/bwlodarski277/discord-pagination.git@v0.1.0"
+pip install "git+https://github.com/bwlodarski277/discord-pagination.git@v0.1.1"
 ```
 
 For local development of this package:
@@ -17,6 +17,8 @@ pip install -e .
 ## Quick start
 
 ```python
+import discord
+
 from discord_pagination import Field, FieldPaginationView
 
 fields = [Field(name=f"Item {i}", value=f"Description {i}") for i in range(30)]
@@ -30,6 +32,8 @@ Subclass `PaginationView[T]` and implement `create_embed` for full control
 over how each page is rendered:
 
 ```python
+import discord
+
 from discord_pagination import PaginationView
 
 class ImagePaginationView(PaginationView[str]):
