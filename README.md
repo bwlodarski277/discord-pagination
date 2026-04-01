@@ -5,7 +5,13 @@ A generic, reusable pagination view for [discord.py](https://github.com/Rapptz/d
 ## Installation
 
 ```bash
-pip install -e path/to/discord-pagination
+pip install "git+https://github.com/bwlodarski277/discord-pagination.git@v0.1.0"
+```
+
+For local development of this package:
+
+```bash
+pip install -e .
 ```
 
 ## Quick start
