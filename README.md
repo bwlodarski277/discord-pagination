@@ -14,6 +14,18 @@ For local development of this package:
 pip install -e .
 ```
 
+## Class hierarchy
+
+```
+BasePaginationView[T]          — abstract base (pagination state, buttons, lifecycle)
+├── EmbedPaginationView[T]     — override create_embed()
+│   └── FieldPaginationView    — ready-made embed-fields view
+└── TextPaginationView[T]      — override format_text()
+```
+
+`PaginationView` is a **deprecated alias** for `EmbedPaginationView` and emits
+a `DeprecationWarning` when subclassed or instantiated.
+
 ## Modes at a glance
 
 | Mode | Constructor | Pages fetched |
@@ -28,7 +40,7 @@ pip install -e .
 ## Eager mode
 
 Pass all items upfront. Use `FieldPaginationView` for the common case of embed
-fields, or subclass `PaginationView[T]` for full rendering control.
+fields, or subclass `EmbedPaginationView[T]` for full rendering control.
 
 ### With `FieldPaginationView`
 
@@ -43,9 +55,9 @@ await view.send(interaction)
 ### With a custom `create_embed`
 
 ```python
-from discord_pagination import PaginationView
+from discord_pagination import EmbedPaginationView
 
-class GalleryView(PaginationView[str]):
+class GalleryView(EmbedPaginationView[str]):
     def create_embed(self, page_items: list[str]) -> discord.Embed:
         embed = discord.Embed(title="Gallery")
         embed.set_image(url=page_items[0])
@@ -54,6 +66,21 @@ class GalleryView(PaginationView[str]):
 
 urls = ["https://example.com/1.png", "https://example.com/2.png"]
 view = GalleryView(urls, page_size=1)
+await view.send(interaction)
+```
+
+### With plain text
+
+```python
+from discord_pagination import TextPaginationView
+
+class LogView(TextPaginationView[str]):
+    def format_text(self, page_items: list[str]) -> str:
+        header = f"**Log** — Page {self.current_page}/{self.total_pages}\n"
+        return header + "\n".join(page_items)
+
+lines = open("app.log").readlines()
+view = LogView(lines, page_size=20)
 await view.send(interaction)
 ```
 
@@ -67,9 +94,9 @@ and cached for the lifetime of the view, which is suitable for most bots with a
 standard interaction timeout.
 
 ```python
-from discord_pagination import PaginationView
+from discord_pagination import EmbedPaginationView
 
-class LeaderboardView(PaginationView[Row]):
+class LeaderboardView(EmbedPaginationView[Row]):
     def __init__(self, total: int) -> None:
         super().__init__(total_items=total, page_size=10)
 
@@ -97,9 +124,9 @@ Set `cache_pages=False` to re-fetch data on every navigation. Also provide a
 underlying dataset may change. Suitable for long-lived views (e.g. `timeout=None`).
 
 ```python
-from discord_pagination import PaginationView
+from discord_pagination import EmbedPaginationView
 
-class LiveLeaderboardView(PaginationView[Row]):
+class LiveLeaderboardView(EmbedPaginationView[Row]):
     def __init__(self, total: int) -> None:
         super().__init__(total_items=total, page_size=10, cache_pages=False, timeout=None)
 
@@ -130,9 +157,9 @@ omit `total_items` entirely. You **must** override `count_items` as this is
 called before every page build to keep `total_pages` accurate.
 
 ```python
-from discord_pagination import PaginationView
+from discord_pagination import EmbedPaginationView
 
-class LiveLeaderboardView(PaginationView[Row]):
+class LiveLeaderboardView(EmbedPaginationView[Row]):
     def __init__(self) -> None:
         super().__init__(cache_pages=False, timeout=None)
 

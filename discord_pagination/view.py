@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import warnings
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generic, TypeAlias, TypeVar
+from typing import Any, Generic, TypeAlias, TypeVar
 
 import discord
 
@@ -18,12 +20,34 @@ class Field:
     inline: bool = True
 
 
-class PaginationView(discord.ui.View, Generic[T]):
-    """Generic paginated embed view for discord.py.
+@dataclass(slots=True)
+class MessageContent:
+    """Render-agnostic page content returned by :meth:`BasePaginationView.format_page`.
 
-    Subclass this and implement :meth:`create_embed` to control how each page
-    is rendered.  For the common case of embed fields, use the ready-made
-    :class:`FieldPaginationView` instead.
+    At least one of *content* or *embed* must be set.
+    """
+
+    content: str | None = None
+    embed: discord.Embed | None = None
+
+    def __post_init__(self) -> None:
+        if self.content is None and self.embed is None:
+            raise ValueError("MessageContent requires at least one of 'content' or 'embed'.")
+
+
+# ════════════════════════════════════════════════════════════════
+#  Base class — all pagination logic, buttons, and lifecycle
+# ════════════════════════════════════════════════════════════════
+
+
+class BasePaginationView(discord.ui.View, ABC, Generic[T]):
+    """Abstract paginated view for discord.py.
+
+    This base class owns all pagination state, button wiring, and
+    send / edit lifecycle.  Subclass one of the render-strategy
+    intermediaries (:class:`EmbedPaginationView`,
+    :class:`TextPaginationView`) or implement :meth:`format_page`
+    directly to control how each page is rendered.
 
     Parameters
     ----------
@@ -82,6 +106,7 @@ class PaginationView(discord.ui.View, Generic[T]):
         self.ephemeral = ephemeral
         self.current_page = 1
         self._message: discord.Message | None = None
+        self._user_content: str | None = None
 
     # ── Properties ──────────────────────────────────────────────
 
@@ -111,34 +136,41 @@ class PaginationView(discord.ui.View, Generic[T]):
             default) or any :class:`~discord.abc.Messageable` such as
             a text channel.
         content:
-            Optional text to send alongside the embed.
+            Optional text to send alongside the page content.
         """
-        embed = await self._build_page()
+        self._user_content = content
+        mc = await self._build_page()
+        kwargs = self._message_kwargs(mc)
 
         if not self._should_paginate:
             self.stop()
             if isinstance(target, discord.Interaction):
                 await target.response.send_message(
-                    content=content, embed=embed, ephemeral=self.ephemeral,
+                    **kwargs, ephemeral=self.ephemeral,
                 )
             else:
-                await target.send(content=content, embed=embed)
+                await target.send(**kwargs)
             return
 
         if isinstance(target, discord.Interaction):
             await target.response.send_message(
-                content=content, embed=embed, view=self, ephemeral=self.ephemeral,
+                **kwargs, view=self, ephemeral=self.ephemeral,
             )
             self._message = await target.original_response()
         else:
-            self._message = await target.send(content=content, embed=embed, view=self)
+            self._message = await target.send(**kwargs, view=self)
 
     # ── Hooks (override in subclasses) ──────────────────────────
 
-    def create_embed(self, page_items: list[T]) -> discord.Embed:
-        """Build the embed for the current page.
+    @abstractmethod
+    def format_page(self, page_items: list[T]) -> MessageContent:
+        """Build the :class:`MessageContent` for the current page.
 
-        Override this method to fully customise embed appearance.
+        Override this method to fully customise page rendering.
+        For convenience, use :class:`EmbedPaginationView` (override
+        :meth:`~EmbedPaginationView.create_embed`) or
+        :class:`TextPaginationView` (override
+        :meth:`~TextPaginationView.format_text`) instead.
 
         Parameters
         ----------
@@ -147,13 +179,9 @@ class PaginationView(discord.ui.View, Generic[T]):
 
         Returns
         -------
-        discord.Embed
-            The rendered embed.
+        MessageContent
+            The rendered page content.
         """
-        raise NotImplementedError(
-            "Subclasses must implement create_embed. "
-            "Use FieldPaginationView for simple embed-field pagination."
-        )
 
     async def load_page(self, page: int, page_size: int) -> list[T]:
         """Fetch items for a single page on demand.
@@ -173,7 +201,8 @@ class PaginationView(discord.ui.View, Generic[T]):
         Returns
         -------
         list[T]
-            Items for this page, which is then passed to :meth:`create_embed`.
+            Items for this page, which is then passed to
+            :meth:`format_page`.
         """
         raise NotImplementedError(
             "Subclasses must implement load_page when using lazy loading."
@@ -218,8 +247,8 @@ class PaginationView(discord.ui.View, Generic[T]):
         start = (self.current_page - 1) * self.page_size
         return self.data[start : start + self.page_size]
 
-    async def _build_page(self) -> discord.Embed:
-        """Build and return the embed for the current page.
+    async def _build_page(self) -> MessageContent:
+        """Build and return the :class:`MessageContent` for the current page.
 
         Updates item count if using live mode, clamps page, syncs buttons.
         """
@@ -227,7 +256,17 @@ class PaginationView(discord.ui.View, Generic[T]):
             self._total_items = await self.count_items()
         self._clamp_page()
         self._sync_buttons()
-        return self.create_embed(await self._get_page_items())
+        return self.format_page(await self._get_page_items())
+
+    def _message_kwargs(self, mc: MessageContent) -> dict[str, Any]:
+        """Merge :class:`MessageContent` with user-provided *content*."""
+        parts = [p for p in (self._user_content, mc.content) if p is not None]
+        kwargs: dict[str, Any] = {}
+        if parts:
+            kwargs["content"] = "\n\n".join(parts)
+        if mc.embed is not None:
+            kwargs["embed"] = mc.embed
+        return kwargs
 
     def _sync_buttons(self) -> None:
         """Update button enabled/disabled state based on current page."""
@@ -245,8 +284,9 @@ class PaginationView(discord.ui.View, Generic[T]):
 
     async def _edit_page(self, interaction: discord.Interaction) -> None:
         """Update the message to show the current page."""
-        embed = await self._build_page()
-        await interaction.edit_original_response(embed=embed, view=self)
+        mc = await self._build_page()
+        kwargs = self._message_kwargs(mc)
+        await interaction.edit_original_response(**kwargs, view=self)
 
     async def on_timeout(self) -> None:
         """Disable all buttons when view times out."""
@@ -299,11 +339,100 @@ class PaginationView(discord.ui.View, Generic[T]):
         await self._edit_page(interaction)
 
 
-class FieldPaginationView(PaginationView[Field]):
+# ════════════════════════════════════════════════════════════════
+#  Render-strategy intermediaries
+# ════════════════════════════════════════════════════════════════
+
+
+class EmbedPaginationView(BasePaginationView[T]):
+    """Paginated view that renders pages as a single :class:`discord.Embed`.
+
+    Subclass this and implement :meth:`create_embed` to control how each
+    page is rendered.  For the common case of embed fields, use the
+    ready-made :class:`FieldPaginationView` instead.
+    """
+
+    def format_page(self, page_items: list[T]) -> MessageContent:
+        return MessageContent(embed=self.create_embed(page_items))
+
+    @abstractmethod
+    def create_embed(self, page_items: list[T]) -> discord.Embed:
+        """Build the embed for the current page.
+
+        Parameters
+        ----------
+        page_items:
+            Items for the current page.
+
+        Returns
+        -------
+        discord.Embed
+            The rendered embed.
+        """
+
+
+class TextPaginationView(BasePaginationView[T]):
+    """Paginated view that renders pages as plain message text.
+
+    Subclass this and implement :meth:`format_text` to control how each
+    page is rendered.
+    """
+
+    def format_page(self, page_items: list[T]) -> MessageContent:
+        return MessageContent(content=self.format_text(page_items))
+
+    @abstractmethod
+    def format_text(self, page_items: list[T]) -> str:
+        """Build the text content for the current page.
+
+        Parameters
+        ----------
+        page_items:
+            Items for the current page.
+
+        Returns
+        -------
+        str
+            The rendered text.
+        """
+
+
+# ════════════════════════════════════════════════════════════════
+#  Deprecated alias
+# ════════════════════════════════════════════════════════════════
+
+_DEPRECATION_MSG = (
+    "PaginationView is deprecated, use EmbedPaginationView (or "
+    "BasePaginationView for a fully custom format_page)."
+)
+
+
+class PaginationView(EmbedPaginationView[T]):
+    """Deprecated alias for :class:`EmbedPaginationView`.
+
+    .. deprecated::
+        Use :class:`EmbedPaginationView` or :class:`BasePaginationView`.
+    """
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+        super().__init_subclass__(**kwargs)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+        super().__init__(*args, **kwargs)
+
+
+# ════════════════════════════════════════════════════════════════
+#  Concrete views
+# ════════════════════════════════════════════════════════════════
+
+
+class FieldPaginationView(EmbedPaginationView[Field]):
     """Paginated view that renders :class:`Field` items as embed fields.
 
     This covers the most common Discord pagination pattern.  For fully custom
-    rendering, subclass :class:`PaginationView` directly.
+    rendering, subclass :class:`EmbedPaginationView` directly.
 
     Parameters
     ----------

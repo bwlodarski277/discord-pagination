@@ -1,3 +1,19 @@
-from discord_pagination.view import Field, FieldPaginationView, PaginationView
+from discord_pagination.view import (
+    BasePaginationView,
+    EmbedPaginationView,
+    Field,
+    FieldPaginationView,
+    MessageContent,
+    PaginationView,
+    TextPaginationView,
+)
 
-__all__ = ["Field", "FieldPaginationView", "PaginationView"]
+__all__ = [
+    "BasePaginationView",
+    "EmbedPaginationView",
+    "Field",
+    "FieldPaginationView",
+    "MessageContent",
+    "PaginationView",
+    "TextPaginationView",
+]
