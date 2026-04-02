@@ -10,3 +10,6 @@ env/
 
 # Editor files
 .vscode/
+
+# Local Copilot workspace instructions
+.github/copilot-instructions.md
