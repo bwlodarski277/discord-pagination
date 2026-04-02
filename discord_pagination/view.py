@@ -75,6 +75,12 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
         Whether Interaction responses are sent as ephemeral messages.
     timeout:
         View timeout in seconds (``None`` to disable).
+    allowed_mentions:
+        Controls which mentions in page content are allowed to ping users.
+        Passed verbatim to every ``send_message``, ``followup.send``, and
+        ``edit_original_response`` call made by the view.  Defaults to
+        ``None``, which preserves existing behaviour (Discord uses the
+        bot's default ``allowed_mentions`` policy).
     """
 
     def __init__(
@@ -86,6 +92,7 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
         page_size: int = 9,
         ephemeral: bool = True,
         timeout: float | None = 180,
+        allowed_mentions: discord.AllowedMentions | None = None,
     ) -> None:
         _lazy = data is None
         if _lazy and total_items is None and cache_pages:
@@ -104,6 +111,7 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
         self._page_cache: dict[int, list[T]] = {}
         self.page_size = page_size
         self.ephemeral = ephemeral
+        self.allowed_mentions = allowed_mentions
         self.current_page = 1
         self._message: discord.Message | None = None
         self._user_content: str | None = None
@@ -146,19 +154,26 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
             self.stop()
             if isinstance(target, discord.Interaction):
                 await target.response.send_message(
-                    **kwargs, ephemeral=self.ephemeral,
+                    **kwargs,
+                    ephemeral=self.ephemeral,
+                    allowed_mentions=self.allowed_mentions,
                 )
             else:
-                await target.send(**kwargs)
+                await target.send(**kwargs, allowed_mentions=self.allowed_mentions)
             return
 
         if isinstance(target, discord.Interaction):
             await target.response.send_message(
-                **kwargs, view=self, ephemeral=self.ephemeral,
+                **kwargs,
+                view=self,
+                ephemeral=self.ephemeral,
+                allowed_mentions=self.allowed_mentions,
             )
             self._message = await target.original_response()
         else:
-            self._message = await target.send(**kwargs, view=self)
+            self._message = await target.send(
+                **kwargs, view=self, allowed_mentions=self.allowed_mentions
+            )
 
     # ── Hooks (override in subclasses) ──────────────────────────
 
@@ -286,7 +301,9 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
         """Update the message to show the current page."""
         mc = await self._build_page()
         kwargs = self._message_kwargs(mc)
-        await interaction.edit_original_response(**kwargs, view=self)
+        await interaction.edit_original_response(
+            **kwargs, view=self, allowed_mentions=self.allowed_mentions
+        )
 
     async def on_timeout(self) -> None:
         """Disable all buttons when view times out."""
