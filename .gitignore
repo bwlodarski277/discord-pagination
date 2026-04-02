@@ -7,3 +7,6 @@ __pycache__/
 env/
 .mypy_cache/
 .pytest_cache/
+
+# Editor files
+.vscode/
