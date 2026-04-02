@@ -156,10 +156,9 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
                 await target.response.send_message(
                     **kwargs,
                     ephemeral=self.ephemeral,
-                    allowed_mentions=self.allowed_mentions,
                 )
             else:
-                await target.send(**kwargs, allowed_mentions=self.allowed_mentions)
+                await target.send(**kwargs)
             return
 
         if isinstance(target, discord.Interaction):
@@ -167,13 +166,10 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
                 **kwargs,
                 view=self,
                 ephemeral=self.ephemeral,
-                allowed_mentions=self.allowed_mentions,
             )
             self._message = await target.original_response()
         else:
-            self._message = await target.send(
-                **kwargs, view=self, allowed_mentions=self.allowed_mentions
-            )
+            self._message = await target.send(**kwargs, view=self)
 
     # ── Hooks (override in subclasses) ──────────────────────────
 
@@ -281,6 +277,8 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
             kwargs["content"] = "\n\n".join(parts)
         if mc.embed is not None:
             kwargs["embed"] = mc.embed
+        if self.allowed_mentions is not None:
+            kwargs["allowed_mentions"] = self.allowed_mentions
         return kwargs
 
     def _sync_buttons(self) -> None:
@@ -301,9 +299,7 @@ class BasePaginationView(discord.ui.View, ABC, Generic[T]):
         """Update the message to show the current page."""
         mc = await self._build_page()
         kwargs = self._message_kwargs(mc)
-        await interaction.edit_original_response(
-            **kwargs, view=self, allowed_mentions=self.allowed_mentions
-        )
+        await interaction.edit_original_response(**kwargs, view=self)
 
     async def on_timeout(self) -> None:
         """Disable all buttons when view times out."""
