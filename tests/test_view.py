@@ -62,7 +62,7 @@ async def test_load_page_called_once_per_page() -> None:
     assert result == [1, 2, 3, 4, 5]
     assert call_log == [(1, 5)]
 
-    await view._get_page_items()  # page 1 again — should use cache
+    await view._get_page_items()  # page 1 again - should use cache
     assert call_log == [(1, 5)]  # load_page not called a second time
 
     view.current_page = 2

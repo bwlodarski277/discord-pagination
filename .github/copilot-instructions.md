@@ -1,4 +1,4 @@
-# discord-pagination — Copilot Instructions
+# discord-pagination - Copilot Instructions
 
 ## Project Overview
 
@@ -8,14 +8,14 @@ The public API lives entirely in `discord_pagination/view.py`. Tests are in `tes
 ## Architecture
 
 ```
-BasePaginationView[T]          — abstract base (ABC): state, buttons, send/edit lifecycle
-├── EmbedPaginationView[T]     — abstract: implements format_page via create_embed()
-│   └── FieldPaginationView    — concrete: renders Field items as embed fields
-└── TextPaginationView[T]      — abstract: implements format_page via format_text()
+BasePaginationView[T]          - abstract base (ABC): state, buttons, send/edit lifecycle
+├── EmbedPaginationView[T]     - abstract: implements format_page via create_embed()
+│   └── FieldPaginationView    - concrete: renders Field items as embed fields
+└── TextPaginationView[T]      - abstract: implements format_page via format_text()
 
-PaginationView                 — deprecated alias for EmbedPaginationView
-MessageContent                 — render-agnostic dataclass returned by format_page()
-Field                          — dataclass for embed field data
+PaginationView                 - deprecated alias for EmbedPaginationView
+MessageContent                 - render-agnostic dataclass returned by format_page()
+Field                          - dataclass for embed field data
 ```
 
 See `README.md` for full loading-mode documentation (eager, lazy snapshot, lazy live, dynamic count).
@@ -34,8 +34,8 @@ python -m pyright .                      # type-check (target: 0 errors, 0 warni
 
 - **SRP**: `BasePaginationView` owns only lifecycle/state; render intermediaries own only their format hook. Do not merge these concerns.
 - **OCP**: Extend via subclass (`EmbedPaginationView`, `TextPaginationView`). Do not add render-specific logic to `BasePaginationView`.
-- **LSP**: Subclasses must honour the contracts of their base — `format_page` must return a valid `MessageContent`; `load_page` must return `list[T]`.
-- **ISP**: Optional hooks (`load_page`, `count_items`) intentionally raise `NotImplementedError` rather than being `@abstractmethod` — eager-mode users must not be forced to implement lazy-loading methods.
+- **LSP**: Subclasses must honour the contracts of their base - `format_page` must return a valid `MessageContent`; `load_page` must return `list[T]`.
+- **ISP**: Optional hooks (`load_page`, `count_items`) intentionally raise `NotImplementedError` rather than being `@abstractmethod` - eager-mode users must not be forced to implement lazy-loading methods.
 - **DIP**: `BasePaginationView` depends on `MessageContent` (an abstraction), never on `discord.Embed` or `str` directly.
 
 ### Python
@@ -88,7 +88,7 @@ Private methods (`_name`) should have a brief one-line docstring. Omit parameter
 ### Discord.py Conventions
 
 - Button decorators use `discord.ButtonStyle.grey` (not `.gray`) for initial state.
-- `discord.ButtonStyle.gray` (the US spelling) is used programmatically in `_sync_buttons` — this is intentional; both spellings are aliases.
+- `discord.ButtonStyle.gray` (the US spelling) is used programmatically in `_sync_buttons` - this is intentional; both spellings are aliases.
 - Always `await interaction.response.defer()` before calling `_edit_page` in button handlers.
 - Expose `ephemeral` as a constructor parameter; default `True` for Interaction targets.
 - `discord.ui.View` button methods must accept `interaction: discord.Interaction` and `_: <ButtonType>` as positional parameters.
@@ -96,14 +96,14 @@ Private methods (`_name`) should have a brief one-line docstring. Omit parameter
 ## Patterns to Preserve
 
 - `_message_kwargs(mc: MessageContent) -> dict[str, Any]` merges user-provided content with page content. Use `if p is not None` (not `if p`) when filtering string parts.
-- `_build_page()` is the single choke-point before any message is sent or edited — all pre-render logic (count refresh, clamp, button sync) belongs here.
-- The `total_pages` property uses ceiling division (`-(-n // d)`) — preserve this idiom.
+- `_build_page()` is the single choke-point before any message is sent or edited - all pre-render logic (count refresh, clamp, button sync) belongs here.
+- The `total_pages` property uses ceiling division (`-(-n // d)`) - preserve this idiom.
 - `_lazy` is computed once in `__init__` from `data is None` and never changed.
 
 ## What Not to Do
 
 - Do not add render-specific logic (embeds, text formatting) to `BasePaginationView`.
-- Do not change `load_page` or `count_items` to `@abstractmethod` — this would violate ISP.
+- Do not change `load_page` or `count_items` to `@abstractmethod` - this would violate ISP.
 - Do not use `if x:` truthiness checks where `None` and a falsy value have distinct meanings.
 - Do not modify `PaginationView` beyond its role as a deprecated alias.
 - Do not add Discord API calls outside of `send()`, `_edit_page()`, and `on_timeout()`.

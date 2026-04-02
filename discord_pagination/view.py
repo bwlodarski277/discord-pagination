@@ -36,7 +36,7 @@ class MessageContent:
 
 
 # ════════════════════════════════════════════════════════════════
-#  Base class — all pagination logic, buttons, and lifecycle
+#  Base class - all pagination logic, buttons, and lifecycle
 # ════════════════════════════════════════════════════════════════
 
 

@@ -17,10 +17,10 @@ pip install -e .
 ## Class hierarchy
 
 ```
-BasePaginationView[T]          — abstract base (pagination state, buttons, lifecycle)
-├── EmbedPaginationView[T]     — override create_embed()
-│   └── FieldPaginationView    — ready-made embed-fields view
-└── TextPaginationView[T]      — override format_text()
+BasePaginationView[T]          - abstract base (pagination state, buttons, lifecycle)
+├── EmbedPaginationView[T]     - override create_embed()
+│   └── FieldPaginationView    - ready-made embed-fields view
+└── TextPaginationView[T]      - override format_text()
 ```
 
 `PaginationView` is a **deprecated alias** for `EmbedPaginationView` and emits
@@ -76,7 +76,7 @@ from discord_pagination import TextPaginationView
 
 class LogView(TextPaginationView[str]):
     def format_text(self, page_items: list[str]) -> str:
-        header = f"**Log** — Page {self.current_page}/{self.total_pages}\n"
+        header = f"**Log** - Page {self.current_page}/{self.total_pages}\n"
         return header + "\n".join(page_items)
 
 lines = open("app.log").readlines()
